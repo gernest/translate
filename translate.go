@@ -12,11 +12,15 @@ var (
 	bucketIDs  = []byte("ids")
 )
 
-type Badger struct {
+type Translate struct {
 	db *badger.DB
 }
 
-func (b *Badger) TranslateID(id uint64) (k string, err error) {
+func New(db *badger.DB) *Translate {
+	return &Translate{db: db}
+}
+
+func (b *Translate) TranslateID(id uint64) (k string, err error) {
 	err = b.db.View(func(txn *badger.Txn) error {
 		it, err := txn.Get(append(bucketIDs, u64tob(id)...))
 		if err != nil {
@@ -30,7 +34,7 @@ func (b *Badger) TranslateID(id uint64) (k string, err error) {
 	return
 }
 
-func (b *Badger) TranslateKey(key string) (n uint64, err error) {
+func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 	err = b.db.Update(func(txn *badger.Txn) error {
 		k := append(bucketKeys, []byte(key)...)
 		it, err := txn.Get(k)
@@ -54,7 +58,7 @@ func (b *Badger) TranslateKey(key string) (n uint64, err error) {
 	return
 }
 
-func (b *Badger) max(txn *badger.Txn) uint64 {
+func (b *Translate) max(txn *badger.Txn) uint64 {
 	o := badger.IteratorOptions{
 		Reverse: true,
 		Prefix:  bucketIDs,
