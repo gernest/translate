@@ -1,4 +1,4 @@
-package pilosa
+package translate
 
 import (
 	"encoding/binary"
