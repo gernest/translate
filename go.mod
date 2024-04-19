@@ -1,4 +1,4 @@
-module gitgub.com/gernest/translate
+module github.com/gernest/translate
 
 go 1.22.2
 

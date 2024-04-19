@@ -58,6 +58,25 @@ func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 	return
 }
 
+// Find finds translated key. Returns 0 if no key was found
+func (b *Translate) Find(key string) (n uint64, err error) {
+	err = b.db.Update(func(txn *badger.Txn) error {
+		k := append(bucketKeys, []byte(key)...)
+		it, err := txn.Get(k)
+		if err != nil {
+			if errors.Is(err, badger.ErrKeyNotFound) {
+				return nil
+			}
+			return err
+		}
+		return it.Value(func(val []byte) error {
+			n = btou64(val)
+			return nil
+		})
+	})
+	return
+}
+
 func (b *Translate) max(txn *badger.Txn) uint64 {
 	o := badger.IteratorOptions{
 		Reverse: true,
