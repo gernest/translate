@@ -10,14 +10,24 @@ import (
 var (
 	bucketKeys = []byte("keys")
 	bucketIDs  = []byte("ids")
+	bucketSeq  = []byte("seq")
 )
 
 type Translate struct {
-	db *badger.DB
+	db  *badger.DB
+	seq *badger.Sequence
 }
 
-func New(db *badger.DB) *Translate {
-	return &Translate{db: db}
+func New(db *badger.DB) (*Translate, error) {
+	seq, err := db.GetSequence(bucketSeq, 1<<10)
+	if err != nil {
+		return nil, err
+	}
+	return &Translate{db: db, seq: seq}, nil
+}
+
+func (t *Translate) Close() error {
+	return t.seq.Release()
 }
 
 func (b *Translate) TranslateID(id uint64) (k string, err error) {
@@ -40,8 +50,10 @@ func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 		it, err := txn.Get(k)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
-				n = b.max(txn)
-				n++
+				n, err = b.seq.Next()
+				if err != nil {
+					return err
+				}
 				x := u64tob(n)
 				return errors.Join(
 					txn.Set(k, x),
@@ -75,19 +87,6 @@ func (b *Translate) Find(key string) (n uint64, err error) {
 		})
 	})
 	return
-}
-
-func (b *Translate) max(txn *badger.Txn) uint64 {
-	o := badger.IteratorOptions{
-		Reverse: true,
-		Prefix:  bucketIDs,
-	}
-	it := txn.NewIterator(o)
-	defer it.Close()
-	for it.Rewind(); it.Valid(); it.Next() {
-		return btou64(it.Item().Key()[len(o.Prefix):])
-	}
-	return 0
 }
 
 // u64tob encodes v to big endian encoding.
