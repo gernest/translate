@@ -76,9 +76,6 @@ func (b *Translate) Find(key string) (n uint64, err error) {
 		k := append(bucketKeys, []byte(key)...)
 		it, err := txn.Get(k)
 		if err != nil {
-			if errors.Is(err, badger.ErrKeyNotFound) {
-				return nil
-			}
 			return err
 		}
 		return it.Value(func(val []byte) error {
