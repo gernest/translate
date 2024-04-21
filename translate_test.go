@@ -36,7 +36,7 @@ func TestTranslate_TranslateKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	tx, err := New(db)
+	tx, err := New(db, []byte("2"))
 	if err != nil {
 		t.Fatal(err)
 	}

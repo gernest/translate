@@ -7,23 +7,22 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-var (
-	bucketKeys = []byte("keys")
-	bucketIDs  = []byte("ids")
-	bucketSeq  = []byte("seq")
-)
-
 type Translate struct {
 	db  *badger.DB
 	seq *badger.Sequence
+
+	keys, ids []byte
 }
 
-func New(db *badger.DB) (*Translate, error) {
-	seq, err := db.GetSequence(bucketSeq, 1<<10)
+func New(db *badger.DB, prefix []byte) (*Translate, error) {
+	seq, err := db.GetSequence(append(prefix, []byte("seq")...), 1<<10)
 	if err != nil {
 		return nil, err
 	}
-	return &Translate{db: db, seq: seq}, nil
+	return &Translate{db: db, seq: seq,
+		keys: append(prefix, []byte("keys")...),
+		ids:  append(prefix, []byte("ids")...),
+	}, nil
 }
 
 func (t *Translate) Close() error {
@@ -32,7 +31,7 @@ func (t *Translate) Close() error {
 
 func (b *Translate) TranslateID(id uint64) (k string, err error) {
 	err = b.db.View(func(txn *badger.Txn) error {
-		it, err := txn.Get(append(bucketIDs, u64tob(id)...))
+		it, err := txn.Get(append(b.ids, u64tob(id)...))
 		if err != nil {
 			return err
 		}
@@ -46,7 +45,7 @@ func (b *Translate) TranslateID(id uint64) (k string, err error) {
 
 func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 	err = b.db.Update(func(txn *badger.Txn) error {
-		k := append(bucketKeys, []byte(key)...)
+		k := append(b.keys, []byte(key)...)
 		it, err := txn.Get(k)
 		if err != nil {
 			if errors.Is(err, badger.ErrKeyNotFound) {
@@ -57,7 +56,7 @@ func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 				x := u64tob(n)
 				return errors.Join(
 					txn.Set(k, x),
-					txn.Set(append(bucketIDs, x...), []byte(key)),
+					txn.Set(append(b.ids, x...), []byte(key)),
 				)
 			}
 			return err
@@ -73,7 +72,7 @@ func (b *Translate) TranslateKey(key string) (n uint64, err error) {
 // Find finds translated key. Returns 0 if no key was found
 func (b *Translate) Find(key string) (n uint64, err error) {
 	err = b.db.Update(func(txn *badger.Txn) error {
-		k := append(bucketKeys, []byte(key)...)
+		k := append(b.keys, []byte(key)...)
 		it, err := txn.Get(k)
 		if err != nil {
 			return err
